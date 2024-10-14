@@ -1,11 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SplitMate</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        #div-persons * {
+            margin: 5px;
+        }
+    </style>
 </head>
-<body>
-    
+
+<body class="container">
+    <h1>SplitMate [alpha]</h1>
+
+    <h4>Persons</h4>
+    <div id="div-persons"></div>
+    <br>
+
+    <h4>Calc</h4>
+    <div id="main">
+        <table class="table table-responsive-sm table-sm">
+            <thead>
+                <tr>
+                    <th width="20%">Item</th>
+                    <th width="20%">Amount</th>
+                    <th width="20%">Buyer</th>
+                    <th>Users</th>
+                    <th width="5%">Action</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+            </tbody>
+        </table>
+        <button class="btn btn-success btn-sm" onclick="addRow()">Add row</button>
+        <button class="btn btn-primary btn-sm" onclick="calc()">Calculate</button>
+
+        <div id="div-result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"
+        integrity="sha384-0pUGZvbkm6XF6gxjEnlmuGrJXVbNuzT9qBBavbLwCsOGabYfZo0T0to5eqruptLy"
+        crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        var persons = [];
+
+        $(document).ready(function () {
+            addRow();
+            addPerson('Y');
+            addPerson('E');
+        });
+
+        function addRow() {
+            let tr = $("#base_body").clone();
+            let id = $.now();
+
+            $("#table-body").append(`
+                <tr class="body-tr" id="tr-` + id + `">
+                    <td><input type="text" class="form-control form-control-sm tb-item"></td>
+                    <td><input type="number" class="form-control form-control-sm tb-amount"></td>
+                    <td><select class="form-select tb-buyer select2"></select></td>
+                    <td><select class="form-select tb-users select2" multiple="multiple"></select></td>
+                    <td><button class="btn btn-danger btn-sm btn-remove-row" onclick="removeRow(this)">x</button></td>
+                </tr>
+            `);
+
+            $('.select2').select2();
+            refreshPersons(id);
+        }
+
+        function removeRow(el) {
+            $(el).parent().parent().remove();
+        }
+
+        function popupAddPerson() {
+            let name = prompt("Enter person name").trim();
+            if (name != null && !Object.values(persons).includes(name)) addPerson(name);
+        }
+
+        function addPerson(name) {
+            var newPerson = new Option(name, name, false, false);
+
+            persons.push(name);
+
+            refreshPersons();
+        }
+
+        function removePerson(key) {
+            persons.splice(key, 1);
+
+            refreshPersons();
+        }
+
+        function refreshPersons(id = null) {
+            let result = '';
+            $.each(persons, function (key, name) {
+                result += `<span class="pill">` + name + `
+                    <button class="btn btn-outline-danger btn-sm" onclick="removePerson(` + key + `)">x</button>
+                </span>`;
+            });
+            result += `<button class="btn btn-info btn-sm" onclick="popupAddPerson()">+</button>`;
+
+            $('#div-persons').html(result);
+
+            let selects = $('.tb-buyer, .tb-users');
+
+            if (id != null) {
+                selects = $('#tr-' + id + ' .tb-buyer, #tr-' + id + ' .tb-users');
+            }
+
+            selects.empty();
+            $.each(persons, function (index, name) {
+                var newOption = new Option(name, name, false, false);
+                selects.append(newOption);
+            });
+
+            selects.trigger('change');
+        }
+
+
+        function calc() {
+            let errors = 0;
+            $('.tb-amount').each(function () {
+                if ($(this).val() < 1) {
+                    errors++;
+                    $(this).focus();
+                    return false;
+                }
+            });
+            if (errors > 0) return;
+
+            $('.tb-users').each(function () {
+                if ($(this).val().length < 1) {
+                    errors++;
+                    $(this).focus();
+                    return false;
+                }
+            });
+            if (errors > 0) return;
+
+            let result = {};
+            $('.body-tr').each(function () {
+                let b = $(this).find('.tb-buyer').val();
+                let u = $(this).find('.tb-users').val();
+                let ul = u.length;
+                let apu = Math.ceil($(this).find('.tb-amount').val() / ul);
+
+                $.each(u, function (key, user) {
+                    if (b == user) return;
+
+                    let rel = user + ' to ' + b;
+                    if (!result.hasOwnProperty(rel)) {
+                        result[rel] = { nom: 0, rival: b + ' to ' + user };
+                    }
+
+                    result[rel]['nom'] += apu;
+                });
+            });
+
+            $('#div-result').html('');
+            $.each(result, function (key, value) {
+                let final;
+                let nm;
+
+                if (result.hasOwnProperty(value['rival'])) {
+                    if (value['nom'] > result[value['rival']]['nom']) {
+                        final = value['nom'] - result[value['rival']]['nom'];
+                        nm = key;
+                    } else {
+                        final = result[value['rival']]['nom'] - value['nom'];
+                        nm = value['rival'];
+                    }
+                } else {
+                    final = value['nom'];
+                    nm = key;
+                }
+
+                $('#div-result').append(nm + ': ' + '<b>IDR ' + final.toLocaleString('id-ID') + '</b><br>');
+            });
+        }
+    </script>
 </body>
+
 </html>
